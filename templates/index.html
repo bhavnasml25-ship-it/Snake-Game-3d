@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Snake Game 3D</title>
+<style>
+body {
+  background: #101827;
+  color: white;
+  font-family: Arial, sans-serif;
+  text-align: center;
+  padding: 20px;
+}
+canvas {
+  background: #07111f;
+  border: 3px solid #38bdf8;
+  max-width: 100%;
+}
+button {
+  padding: 12px 20px;
+  margin: 10px;
+  border: 0;
+  border-radius: 8px;
+  background: #38bdf8;
+  cursor: pointer;
+  font-weight: bold;
+}
+</style>
+</head>
+<body>
+<h1>🐍 Snake Game</h1>
+<p>Use your arrow keys to move.</p>
+<canvas id="game" width="400" height="400"></canvas>
+<h2>Score: <span id="score">0</span></h2>
+<p id="message">Press Start to play!</p>
+<button onclick="startGame()">Start / Restart</button>
+<h3>🏆 Top Scores</h3>
+<ol id="scores"></ol>
+
+<script>
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+const size = 20;
+const cells = canvas.width / size;
+
+let snake, food, dx, dy, score, timer, running;
+
+function startGame() {
+  clearInterval(timer);
+  snake = [{x: 10, y: 10}];
+  food = {x: 5, y: 5};
+  dx = 1;
+  dy = 0;
+  score = 0;
+  running = true;
+  document.getElementById("score").textContent = score;
+  document.getElementById("message").textContent = "Good luck!";
+  draw();
+  timer = setInterval(step, 120);
+}
+
+document.addEventListener("keydown", e => {
+  const keys = {
+    ArrowUp: [0, -1],
+    ArrowDown: [0, 1],
+    ArrowLeft: [-1, 0],
+    ArrowRight: [1, 0]
+  };
+  if (!keys[e.key]) return;
+  e.preventDefault();
+  const [x, y] = keys[e.key];
+  if (x !== -dx || y !== -dy) {
+    dx = x;
+    dy = y;
+  }
+});
+
+function step() {
+  if (!running) return;
+
+  const head = {x: snake[0].x + dx, y: snake[0].y + dy};
+  const eating = head.x === food.x && head.y === food.y;
+  const body = eating ? snake : snake.slice(0, -1);
+
+  if (head.x < 0 || head.y < 0 ||
+      head.x >= cells || head.y >= cells ||
+      body.some(p => p.x === head.x && p.y === head.y)) {
+    endGame();
+    return;
+  }
+
+  snake.unshift(head);
+
+  if (eating) {
+    score += 10;
+    document.getElementById("score").textContent = score;
+    food = {
+      x: Math.floor(Math.random() * cells),
+      y: Math.floor(Math.random() * cells)
+    };
+  } else {
+    snake.pop();
+  }
+
+  draw();
+}
+
+function draw() {
+  ctx.fillStyle = "#07111f";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  ctx.fillStyle = "#fb7185";
+  ctx.fillRect(food.x * size, food.y * size, size - 2, size - 2);
+
+  snake.forEach((p, i) => {
+    ctx.fillStyle = i === 0 ? "#38bdf8" : "#22c55e";
+    ctx.fillRect(p.x * size, p.y * size, size - 2, size - 2);
+  });
+}
+
+async function endGame() {
+  running = false;
+  clearInterval(timer);
+  document.getElementById("message").textContent =
+    "Game over! Your score: " + score;
+
+  try {
+    await fetch("/scores", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({score})
+    });
+    loadScores();
+  } catch (error) {
+    document.getElementById("message").textContent +=
+      " Score could not be saved.";
+  }
+}
+
+async function loadScores() {
+  try {
+    const response = await fetch("/scores");
+    const scores = await response.json();
+    document.getElementById("scores").innerHTML = "";
+    scores.forEach(item => {
+      const li = document.createElement("li");
+      li.textContent = item.score;
+      document.getElementById("scores").appendChild(li);
+    });
+  } catch (error) {
+    console.log("Could not load scores.");
+  }
+}
+
+loadScores();
+</script>
+</body>
+</html>
